@@ -131,3 +131,10 @@ def isRaining(NodeControl):
     except Exception, exp:
         NodeControl.log.warning("Error reading isRaining. Error: %s." % traceback.format_exc())
         return None
+
+
+def checkDevices():
+    # TODO
+    # checks if all devices are found (does NOT check valid readings)
+
+    allDevicesFound = False

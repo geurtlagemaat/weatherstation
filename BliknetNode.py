@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import traceback
 
@@ -20,6 +21,7 @@ oNodeControl = None
 
 def setupGPIO():
     if os.name == 'posix':
+        GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(23, GPIO.OUT)
         GPIO.setup(24, GPIO.OUT) # garden lights
@@ -40,25 +42,43 @@ def checkLights():
         elif not (oNodeControl.nodeProps.has_option('gardenlightswitching', 'country')):
             oNodeControl.log.error('setting not found: gardenlightswitching | country, can not init.')
         else:
-            a = Astral()
-            a.solar_depression = 'civil'
-            l = Location((oNodeControl.nodeProps.get('gardenlightswitching', 'city'),
-                          oNodeControl.nodeProps.get('gardenlightswitching', 'country'),
-                          oNodeControl.nodeProps.get('gardenlightswitching', 'lat'),
-                          oNodeControl.nodeProps.get('gardenlightswitching', 'long'),
-                          oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'),
-                          oNodeControl.nodeProps.get('gardenlightswitching', 'elev')))
-            mySun = l.sun()
-            oNodeControl.log.debug('Dawn: %s.' % str(mySun['dawn']))
-            oNodeControl.log.debug('Sunrise: %s.' % str(mySun['sunrise']))
-            oNodeControl.log.debug('Sunset: %s.' % str(mySun['sunset']))
-            oNodeControl.log.debug('Susk: %s.' % str(mySun['dusk']))
-            oNodeControl.log.debug("Current time %s." % str(datetime.datetime.now()))
-            if datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) > mySun['sunrise'] and \
-                datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) < mySun['dusk']:
-                GPIO.output(24, 0)
-            elif datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) > mySun['dusk']:
-                GPIO.output(24, 1)
+            try:
+                city = oNodeControl.nodeProps.get('gardenlightswitching', 'city')
+                country = oNodeControl.nodeProps.get('gardenlightswitching', 'country')
+                lat = oNodeControl.nodeProps.get('gardenlightswitching', 'lat')
+                long = oNodeControl.nodeProps.get('gardenlightswitching', 'long')
+                localtimezone = oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone')
+                elev = oNodeControl.nodeProps.get('gardenlightswitching', 'elev')
+                a = Astral()
+                a.solar_depression = 'civil'
+                l = Location()
+                l.name = city
+                l.region = country
+                if "°" in lat:
+                    l.latitude = lat # example: 51°31'N parsed as string
+                else:
+                    l.latitude = float(lat) #  make it a float
+
+                if "°" in long:
+                    l.longitude = long
+                else:
+                    l.longitude = float(long)
+
+                l.timezone = localtimezone
+                l.elevation = elev
+                mySun = l.sun()
+                oNodeControl.log.debug('Dawn: %s.' % str(mySun['dawn']))
+                oNodeControl.log.debug('Sunrise: %s.' % str(mySun['sunrise']))
+                oNodeControl.log.debug('Sunset: %s.' % str(mySun['sunset']))
+                oNodeControl.log.debug('Susk: %s.' % str(mySun['dusk']))
+                oNodeControl.log.debug("Current time %s." % str(datetime.datetime.now()))
+                if datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) > mySun['sunrise'] and \
+                    datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) < mySun['dusk']:
+                    GPIO.output(24, 0)
+                elif datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) > mySun['dusk']:
+                    GPIO.output(24, 1)
+            except Exception, exp:
+                oNodeControl.log.error("checkLights init error. Error %s." % (traceback.format_exc()))
 
 def cleanPrecipitationTable():
     oNodeControl.log.info("cleanPrecipitationTable")
@@ -136,3 +156,6 @@ if __name__ == '__main__':
         if oNodeControl.nodeProps.getboolean('watchdog', 'circusWatchDog') == True:
             oNodeControl.circusNotifier.start()
     reactor.run()
+
+    GPIO.output(23, 0)
+    GPIO.output(24, 0)
