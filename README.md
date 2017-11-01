@@ -7,12 +7,11 @@ Using Arduino Pro on a serial port to connect Maplin sensor (real time processin
 Work in progress. 
 
 TODO:
-Self Test (I2C bus), DHT22
-Ignore DHT22 abnormal readings
-wunderground upload https://www.wunderground.com/personal-weather-station/dashboard?ID=IOVERIJS56
-http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol
-Setup
-Requirements
-Statistics
-Push notification lightning
-SI1145 setup
++ Self Test (I2C bus), DHT22
++ Ignore DHT22 abnormal readings
++ wunderground upload http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol
++ Setup
++ Requirements
++ Statistics
++ Push notification lightning
++ SI1145 setup
