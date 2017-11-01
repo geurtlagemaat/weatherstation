@@ -22,7 +22,7 @@ def setupGPIO():
     if os.name == 'posix':
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(23, GPIO.OUT)
-        GPIO.setup(24, GPIO.OUT)
+        GPIO.setup(24, GPIO.OUT) # garden lights
 
 def checkLights():
     if oNodeControl.nodeProps.has_option('gardenlightswitching', 'active') and \
@@ -54,10 +54,10 @@ def checkLights():
             oNodeControl.log.debug('Sunset: %s.' % str(mySun['sunset']))
             oNodeControl.log.debug('Susk: %s.' % str(mySun['dusk']))
             oNodeControl.log.debug("Current time %s." % str(datetime.datetime.now()))
-            if datetime.datetime.now(pytz.timezone(LOCALTIMEZONE)) > mySun['sunrise'] and \
-                datetime.datetime.now(pytz.timezone(LOCALTIMEZONE)) < mySun['dusk']:
+            if datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) > mySun['sunrise'] and \
+                datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) < mySun['dusk']:
                 GPIO.output(24, 0)
-            elif datetime.datetime.now(pytz.timezone(LOCALTIMEZONE)) > mySun['dusk']:
+            elif datetime.datetime.now(pytz.timezone(oNodeControl.nodeProps.get('gardenlightswitching', 'localtimezone'))) > mySun['dusk']:
                 GPIO.output(24, 1)
 
 def cleanPrecipitationTable():
