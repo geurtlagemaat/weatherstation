@@ -32,7 +32,7 @@ def doUpdate(NodeControl):
             combinedPress = "{0}.{1}".format(rawPresNum / 100, rawPresNum % 100)
             formattedPress = '{:.1f}'.format(float(combinedPress))
 
-            NodeControl.MQTTPublish(sTopic="weer/temp", sValue=str(Temp), iQOS=0, bRetain=False)
+            # NodeControl.MQTTPublish(sTopic="weer/temp", sValue=str(Temp), iQOS=0, bRetain=False)
             NodeControl.MQTTPublish(sTopic="weer/luchtdruk", sValue=str(formattedPress), iQOS=0, bRetain=True)
         except Exception, exp:
             NodeControl.log.warning("Error pressure status update, error: %s." % (traceback.format_exc()))
@@ -86,10 +86,12 @@ def getDHT22Data(NodeControl, Pin, iTry):
     sensor = Adafruit_DHT.DHT22
     humidity, temperature = Adafruit_DHT.read_retry(sensor, Pin)
     if humidity is not None and temperature is not None:
-        Temp = '{:.1f}'.format(temperature)
-        Hum = '{:.1f}'.format(humidity)
-        NodeControl.MQTTPublish(sTopic="weer/temp", sValue=str(Temp), iQOS=0, bRetain=True)
-        NodeControl.MQTTPublish(sTopic="weer/hum", sValue=str(Hum), iQOS=0, bRetain=True)
+        if ( ( (temperature > -30) and  (temperature < 60) ) and
+             ( (humidity > 0) and (humidity < 101) ) ):
+            Temp = '{:.1f}'.format(temperature)
+            Hum = '{:.1f}'.format(humidity)
+            NodeControl.MQTTPublish(sTopic="weer/temp", sValue=str(Temp), iQOS=0, bRetain=True)
+            NodeControl.MQTTPublish(sTopic="weer/hum", sValue=str(Hum), iQOS=0, bRetain=True)
     else:
         if iTry < 15:
             reactor.callLater(2, getDHT22Data, NodeControl, Pin, iTry+1)
