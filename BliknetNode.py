@@ -134,7 +134,10 @@ if __name__ == '__main__':
         elif not (oNodeControl.nodeProps.has_option('serial', 'baudrate')):
             oNodeControl.log.error('serial baudrate not found (serialbus/baudrate), can not init.')
         else:
-            SerialBusMaster = SerialBusMaster(oNodeControl)
+            try:
+                SerialBusMaster = SerialBusMaster(oNodeControl)
+            except Exception, exp:
+                oNodeControl.log.error("SerialBusMaster init failed. Error %s." % (traceback.format_exc()))
     else:
         oNodeControl.log.info("Serial Bus not active.")
 
