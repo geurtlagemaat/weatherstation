@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import os
 import traceback
-
 import datetime
+
+from RPi_AS3935 import RPi_AS3935
 from twisted.internet import reactor
 from twisted.internet import task
 
@@ -18,6 +19,32 @@ import pytz
 from astral import Astral, Location
 
 oNodeControl = None
+AS3935Sensor = None
+
+def setupAS3935Sensor():
+    try:
+        AS3935Sensor = RPi_AS3935(address=0x03, bus=1)
+
+        AS3935Sensor.set_indoors(False)
+        AS3935Sensor.set_noise_floor(0)
+        # TODO: calibrate needed ? sensor.calibrate(tun_cap=0x0F)
+    except Exception, exp:
+        oNodeControl.log.error("Error during AS3935 init. Error %s." % (traceback.format_exc()))
+
+def lightningInterrupt():
+    datetime.time.sleep(0.003)
+    global AS3935Sensor
+    reason = AS3935Sensor.get_interrupt()
+    if reason == 0x01:
+        oNodeControl.log.debug("Noise level too high - adjusting")
+        AS3935Sensor.raise_noise_floor()
+    elif reason == 0x04:
+        oNodeControl.log.debug("Disturber detected - masking")
+        AS3935Sensor.set_mask_disturber(True)
+    elif reason == 0x08:
+        distance = AS3935Sensor.get_distance()
+        oNodeControl.log.debug("We sensed lightning! It was %s km away" % str(distance) )
+        oNodeControl.MQTTPublish(sTopic="lightning/distance", sValue=str(distance), iQOS=0, bRetain=False)
 
 def setupGPIO():
     if os.name == 'posix':
@@ -25,6 +52,8 @@ def setupGPIO():
         GPIO.setmode(GPIO.BCM)
         GPIO.setup(23, GPIO.OUT)
         GPIO.setup(24, GPIO.OUT) # garden lights
+        GPIO.setup(27, GPIO.IN)
+        GPIO.add_event_detect(27, GPIO.RISING, callback=lightningInterrupt)
 
 def checkLights():
     if oNodeControl.nodeProps.has_option('gardenlightswitching', 'active') and \
@@ -123,7 +152,7 @@ if __name__ == '__main__':
 
     setupGPIO()
     checkDB()
-
+    setupAS3935Sensor()
     l = task.LoopingCall(cleanPrecipitationTable)
     l.start(86400)
 
