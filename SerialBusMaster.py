@@ -1,4 +1,5 @@
 from twisted.internet import reactor
+from twisted.internet import task
 from twisted.internet.serialport import SerialPort, serial
 import datetime, traceback
 from SerialBusReceiver import SerialBusReceiver
@@ -6,16 +7,8 @@ from SerialBusReceiver import SerialBusReceiver
 class SerialBusMaster(object):
     def __init__(self, oNodeControl):
         self._NodeControl = oNodeControl
-
-        iTimeOut = 2
-        if oNodeControl.nodeProps.has_option('serial', 'timeout'):
-            oNodeControl.nodeProps.getint('serial', 'timeout')
-        iRetrys = 3
-        if oNodeControl.nodeProps.has_option('serial', 'retrys'):
-            iRetrys = oNodeControl.nodeProps.getint('serial', 'retrys')
-        bRetrysFirst = True
-        if oNodeControl.nodeProps.has_option('serial', 'retrysfirst'):
-            bRetrysFirst = oNodeControl.nodeProps.getboolean('serial', 'retrysfirst')
+        self._windData = []
+        self._isRainInit = True
 
         myProtocol = SerialBusReceiver(oNodeControl, OnReceive=self.OnMsgReceive)
 
@@ -25,6 +18,20 @@ class SerialBusMaster(object):
                    bytesize=serial.EIGHTBITS,
                    parity=serial.PARITY_NONE)
 
+        l = task.LoopingCall(self.eUpdateWind)
+        l.start(60)
+
+    def eUpdateWind(self):
+        if self._windData is not None and len(self._windData):
+            try:
+                minuteWindMPH = sum(self._windData)/len(self._windData)
+                minuteWindKMH = minuteWindMPH * 1.60934
+                minuteWindMtrSec = minuteWindKMH / 3.6
+                minuteFormatedValue = '{:.1f}'.format(minuteWindMtrSec)
+                self._NodeControl.setProperty('curr-windspeed', minuteFormatedValue)
+                del self._windData[:]
+            except Exception, exp:
+                self._NodeControl.log.warning("Error calculation average wind data, error: %s." % (traceback.format_exc()))
 
     def OnMsgReceive(self, RecMsg):
         """
@@ -38,22 +45,23 @@ class SerialBusMaster(object):
         en
         RAIN_DETECT;
         """
-        # print "receive: %s" % RecMsg
         if "WIND_SPEED:MPH:" in RecMsg:
-            MyWindSpeedMPH = RecMsg[RecMsg.index('MPH:') + len('MPH:')-1]
-            self._NodeControl.setProperty('curr-windspeed', MyWindSpeedMPH)
-            # TODO gemiddelde en gust
-            # TODO to KMH en beaufort https://en.wikipedia.org/wiki/Beaufort_scale
+            MyWindSpeedMPH = RecMsg[RecMsg.index('MPH:') + len('MPH:'):-1]
+            self._windData.append(float(MyWindSpeedMPH))
+            # TODO beaufort https://en.wikipedia.org/wiki/Beaufort_scale
         elif "RAIN_DETECT" in RecMsg:
-            self._NodeControl.log.debug("rain tip over event")
-            if self._NodeControl.DBCursor is not None:
-                try:
-                    self._NodeControl.DBCursor.execute('INSERT INTO precipitation VALUES (?)',(datetime.datetime.now(),))
-                    self._NodeControl.DBConn.commit()
-                except Exception, exp:
-                    self._NodeControl.log.error("Error updating database, error: %s." % traceback.format_exc())
+            if self._isRainInit:
+                self._isRainInit = False
             else:
-                self._NodeControl.log.warning("No DBCursor found, can not write")
+                self._NodeControl.log.debug("rain tip over event")
+                if self._NodeControl.DBCursor is not None:
+                    try:
+                        self._NodeControl.DBCursor.execute('INSERT INTO precipitation VALUES (?)',(datetime.datetime.now(),))
+                        self._NodeControl.DBConn.commit()
+                    except Exception, exp:
+                        self._NodeControl.log.error("Error updating database, error: %s." % traceback.format_exc())
+                else:
+                    self._NodeControl.log.warning("No DBCursor found, can not write")
         elif "WIND_DIRECTION:ARB:":
             myWindDir = RecMsg[RecMsg.index('ARB:') + len('ARB:')-1]
             self._NodeControl.setProperty('curr-winddir', myWindDir)
